@@ -1,0 +1,74 @@
+name: procgen-studio
+version: 0.1.0
+description: "Image and video backend that draws with code: your configured model writes SVG/Python drawing programs, rendered locally to PNG/MP4 with the editable source and a reproducible seed. No image API key, STYLE.md art contracts, critic loop with bounded redraws."
+author: Lucas (iamlukethedev)
+kind: backend
+manifest_version: 2
+license: MIT
+homepage: https://github.com/iamlukethedev/hermes-procgen-studio
+tags: [image-generation, video-generation, svg, procedural, game-assets, offline]
+requires_hermes: ">=0.22.7"
+provides_tools: []
+provides_hooks: []
+config_schema:
+  preset:
+    type: str
+    default: flat-illustration
+    choices: [flat-illustration, ember, frost, dark-fantasy-lowpoly, brand-minimal, pixel-arcade]
+    label: Default style preset
+    description: "Used when no STYLE.md applies (project ./STYLE.md or ./.procgen/STYLE.md, your user STYLE.md, or style_file)."
+  style_file:
+    type: str
+    default: ""
+    label: STYLE.md path
+    description: "Optional path to a STYLE.md that applies everywhere (relative paths resolve against the working directory)."
+  critic:
+    type: str
+    default: auto
+    choices: [auto, vision, structure, off]
+    label: Critic mode
+    description: "auto tries a vision review of the PNG and falls back to a code/structure review when the model cannot take images."
+  max_redraws:
+    type: int
+    default: 2
+    label: Max redraws
+    description: "Upper bound on extra model calls per image for repairs and critic-driven redraws (0-6)."
+  min_score:
+    type: int
+    default: 7
+    label: Critic pass score
+    description: "Renders scoring below this (0-10) are redrawn while redraws remain."
+  allow_python:
+    type: bool
+    default: true
+    label: Allow Python drawing programs
+    description: "Python programs run in a separate sandboxed process (AST allowlist, audit hook, resource limits). Off = SVG and pixel specs only."
+  output_dir:
+    type: str
+    default: ""
+    label: Project output folder
+    description: "Optional folder that also receives each PNG plus its source and metadata (for example ./assets/procgen)."
+  render_timeout:
+    type: int
+    default: 90
+    label: Render timeout (seconds)
+  llm_timeout:
+    type: int
+    default: 300
+    label: Model call timeout (seconds)
+  max_tokens:
+    type: int
+    default: 16000
+    label: Max tokens per drawing
+  fps:
+    type: int
+    default: 24
+    label: Video frame rate
+  video_seconds:
+    type: int
+    default: 4
+    label: Default video length (seconds)
+  gif:
+    type: bool
+    default: true
+    label: Also write a GIF next to each MP4
