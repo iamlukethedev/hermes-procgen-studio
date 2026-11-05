@@ -56,6 +56,11 @@ config_schema:
     type: int
     default: 300
     label: Model call timeout (seconds)
+  time_budget:
+    type: int
+    default: 360
+    label: Time budget per image (seconds)
+    description: "Redraws stop and the best attempt is returned before this much time has passed. Keep it under Hermes's tool deadline (timeouts.tools.sequential_call, 420 s by default); 0 disables."
   max_tokens:
     type: int
     default: 16000

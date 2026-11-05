@@ -32,6 +32,11 @@ VIDEO_HEIGHTS = {"480p": 480, "540p": 540, "720p": 720, "1080p": 1080}
 _DIRECTIVE_RE = re.compile(r"\[(?:procgen[:\s]+)?((?:\s*[a-z_]+\s*=\s*[^\]\s]+\s*)+)\]", re.IGNORECASE)
 _DIRECTIVE_KEYS = {"style", "seed", "set", "renderer", "critic", "redraws", "size", "fps", "loop"}
 
+# Cost guesses (seconds) before a call of that kind has been measured in the current loop.
+DRAW_COST_GUESS = 60.0
+CRITIC_COST_GUESS = 30.0
+ROUND_MARGIN = 10.0
+
 
 class GenerationError(RuntimeError):
     def __init__(self, message: str, *, error_type: str = "generation_failed", history: Optional[list] = None):
@@ -53,6 +58,7 @@ class Settings:
     output_dir: str = ""
     render_timeout: int = 90
     llm_timeout: int = 300
+    time_budget: int = 360
     max_tokens: int = 16000
     fps: int = 24
     video_seconds: int = 4
@@ -84,6 +90,7 @@ class Settings:
         s.max_redraws = max(0, min(6, s.max_redraws))
         s.min_score = max(0, min(10, s.min_score))
         s.render_timeout = max(5, min(600, s.render_timeout))
+        s.time_budget = 0 if s.time_budget <= 0 else max(5, s.time_budget)
         s.fps = max(4, min(60, s.fps))
         s.video_seconds = max(1, min(15, s.video_seconds))
         return s
@@ -428,6 +435,32 @@ class Engine:
         attempts_dir.mkdir(parents=True, exist_ok=True)
         history: List[Dict[str, Any]] = []
         t0 = time.monotonic()
+        deadline = t0 + s.time_budget if s.time_budget > 0 else None
+        critic_on = policy["critic"] != "off"
+
+        def remaining() -> float:
+            return float("inf") if deadline is None else deadline - time.monotonic()
+
+        def fit_timeout() -> None:
+            llm.timeout = float(s.llm_timeout) if deadline is None else max(20.0, min(float(s.llm_timeout),
+                                                                                   remaining() - 5.0))
+
+        def cost(prefixes: Tuple[str, ...], fallback: float) -> float:
+            spent = [c.seconds for c in llm.calls if c.purpose.startswith(prefixes)]
+            return max(spent) if spent else fallback
+
+        def can_redraw() -> bool:
+            # Hermes cuts a tool call off at timeouts.tools.sequential_call (420 s by default); stop
+            # early with the best attempt rather than lose everything to that deadline.
+            need = cost(("draw", "repair", "redraw"), DRAW_COST_GUESS) + ROUND_MARGIN + \
+                (cost(("critic",), CRITIC_COST_GUESS) if critic_on else 0.0)
+            if remaining() > need:
+                return True
+            rec.extra["stopped_early"] = f"time budget: {max(0.0, remaining()):.0f}s left, next round needs ~{need:.0f}s"
+            logger.info("procgen %s: %s", rec.id, rec.extra["stopped_early"])
+            return False
+
+        fit_timeout()
         text = self._call_draw(llm, system, first_user, "draw")
         program, error = self._extract(text, s.allow_python)
         best: Optional[Tuple[Program, Any, Any]] = None
@@ -449,10 +482,11 @@ class Engine:
                          "render_s": round(time.monotonic() - started, 2)}
                 history.append(entry)
                 logger.info("procgen %s attempt %d failed to render: %s", rec.id, n, entry["error"][:200])
-                if n > budget:
+                if n > budget or not can_redraw():
                     break
                 broken = program.code if program is not None else text[:6000]
                 kind = program.kind if program is not None else "python"
+                fit_timeout()
                 text = llm.draw(system, prompts.repair_prompt(req, broken, kind, error or "no code block"),
                                 purpose=f"repair.{n}")
                 program, error = self._extract(text, s.allow_python)
@@ -463,16 +497,26 @@ class Engine:
                 image = contact_strip(result.frames, attempts_dir / f"{n:02d}" / "strip.png")
                 note = (f"The image is a strip of {len(result.frames)} frames of the animation at "
                         f"t = {', '.join(f'{t:.2f}' for t in times)}. Judge motion and the final frame.")
+            mode = policy["critic"]
+            skipped = critic_on and remaining() < cost(("critic",), CRITIC_COST_GUESS) + ROUND_MARGIN / 2
+            if skipped:
+                mode = "off"
+                rec.extra["critic_skipped"] = "time budget"
+            fit_timeout()
             verdict = critic_mod.review(llm, req, image=image, code=program.code, kind=program.kind,
-                                        mode=policy["critic"], min_score=policy["min_score"], frames_note=note)
+                                        mode=mode, min_score=policy["min_score"], frames_note=note)
+            if skipped and verdict.mode == "off":
+                verdict.mode, verdict.score, verdict.note = "skipped", policy["min_score"], \
+                    "critic skipped: not enough time budget left"
             entry = {"attempt": n, "ok": True, **verdict.as_dict(), "render_s": round(time.monotonic() - started, 2)}
             history.append(entry)
             logger.info("procgen %s attempt %d: score=%s passed=%s mode=%s issues=%s", rec.id, n, verdict.score,
                         verdict.passed, verdict.mode, "; ".join(verdict.issues)[:300])
             if best is None or verdict.score >= best[2].score:
                 best = (program, result, verdict)
-            if verdict.passed or n > budget:
+            if verdict.passed or n > budget or not can_redraw():
                 break
+            fit_timeout()
             text = llm.draw(system, prompts.revise_prompt(req, program.code, program.kind, verdict.issues,
                                                           verdict.fixes), purpose=f"redraw.{n}")
             program, error = self._extract(text, s.allow_python)

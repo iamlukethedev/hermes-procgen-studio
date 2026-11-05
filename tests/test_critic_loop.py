@@ -156,3 +156,43 @@ def test_seed_directive_and_style_directive_apply(make_engine):
     assert out.record.seed == 99 and out.record.style["palette"] == "frost" and out.record.set == "loot"
     user = llm.complete_calls[0]["messages"][1]["content"]
     assert "SEED=99" in user and "frost" in user and "[seed" not in user
+
+
+class SlowLlm(FakeLlm):
+    def __init__(self, *a, delay=0.0, **kw):
+        super().__init__(*a, **kw)
+        self.delay = delay
+
+    def complete(self, messages, **kw):
+        import time
+        time.sleep(self.delay)
+        return super().complete(messages, **kw)
+
+
+def test_time_budget_stops_redraws_and_keeps_best_attempt(make_engine, monkeypatch):
+    import procgen_studio.engine as eng
+    monkeypatch.setattr(eng, "DRAW_COST_GUESS", 0.5)
+    monkeypatch.setattr(eng, "CRITIC_COST_GUESS", 0.1)
+    monkeypatch.setattr(eng, "ROUND_MARGIN", 0.5)
+    llm = SlowLlm([GOOD], [FAIL], delay=1.0)
+    engine, _ = make_engine(llm, max_redraws=6, time_budget=5)
+    out = engine.generate("four game icons", aspect_ratio="square")
+    assert 1 <= len(llm.complete_calls) < 7, "redraws stop before the budget runs out"
+    assert "time budget" in out.record.extra["stopped_early"]
+    assert Path(out.record.output).is_file()
+    assert all(c["timeout"] <= 20 for c in llm.complete_calls), "call timeouts shrink to the 20 s floor"
+
+
+def test_critic_skipped_when_budget_is_too_short(make_engine):
+    llm = FakeLlm([GOOD], [FAIL])
+    engine, _ = make_engine(llm, time_budget=5)
+    out = engine.generate("four game icons", aspect_ratio="square")
+    assert llm.structured_calls == []
+    assert out.verdict.mode == "skipped" and "time budget" in out.verdict.note
+
+
+def test_time_budget_zero_means_unbounded_time(make_engine):
+    llm = FakeLlm([GOOD], [FAIL])
+    engine, _ = make_engine(llm, max_redraws=2, time_budget=0)
+    out = engine.generate("four game icons", aspect_ratio="square")
+    assert len(llm.complete_calls) == 3 and "stopped_early" not in out.record.extra
