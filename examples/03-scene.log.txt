@@ -1,8 +1,8 @@
-pg-851c5e4e  generate  image  1536x1024  seed=829086  style=flat-illustration/flat-illustration  renderer=python
+pg-b461a5a6  generate  image  1536x1024  seed=829086  style=flat-illustration/flat-illustration  renderer=python
   prompt:  A wide flat-illustration hero scene: a cabin in a moonlit pine forest at night, warm windows, a path leading to the door, layered hills and fog.
-  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_a-wide-flat-illustration-hero-sc_pg-851c5e4e.png
-  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-851c5e4e/source.py
-  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-851c5e4e/meta.json
+  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_a-wide-flat-illustration-hero-sc_pg-b461a5a6.png
+  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-b461a5a6/source.py
+  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-b461a5a6/meta.json
   critic:  1 attempt(s), final score 8, mode vision
     #1: score 8 pass
   model:   custom/replay  calls=2 tokens=3000

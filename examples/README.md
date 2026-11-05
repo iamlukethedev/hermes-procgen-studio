@@ -14,6 +14,7 @@ size, style, palette) and the render log (`.log.txt`: record path, critic result
 | `04-logo` | A logo and wordmark for a developer tools startup called forgeline, tagline 'SHIP AGENTS, NOT GLUE': a hexagon mark with a terminal prompt glyph. `[style=brand-minimal]` |
 | `05-monster` | A low-poly dark fantasy monster called THE HOLLOW WARDEN: hulking horned golem with glowing eyes and an ember crack in its chest, full body. `[style=dark-fantasy-lowpoly]` |
 | `06-scene-reroll-seed7` | `hermes procgen reroll <scene id> --seed 7`: the scene's program re-run locally with a new seed, no model call |
+| `07-logo-motion` (`.mp4`, `.gif`) | Through `video_generate`: Animate a logo reveal for forgeline: the hexagon outline draws on, the prompt glyph slides in, the sparkle pops, then the wordmark fades up. `[style=brand-minimal]` |
 
 `gallery.png`, `presets.png` and `banner.png` are built from these files by
 `scripts/make_gallery.py` (`presets.png` renders each preset's reference technique locally).
@@ -37,3 +38,7 @@ verdict. Everything downstream of the model (Hermes's tool dispatch, the provide
 the sandboxed renderer, STYLE.md resolution, the critic loop bookkeeping, sidecars, re-rolls) ran
 for real. Run `bash scripts/e2e.sh` with your own model to regenerate this folder from live
 drawings.
+
+[`local-model-check/`](local-model-check/README.md) is a separate run with a genuine model
+(qwen2.5-coder 7B on CPU) driving the drawing and critic slots: proof that the live path works,
+and an honest look at what a small model produces.

@@ -1,5 +1,5 @@
 {
-  "id": "pg-cdfadfbc",
+  "id": "pg-1174e7b2",
   "prompt": "A wide flat-illustration hero scene: a cabin in a moonlit pine forest at night, warm windows, a path leading to the door, layered hills and fog.",
   "seed": 7,
   "width": 1536,
@@ -38,8 +38,8 @@
     }
   },
   "media": "image",
-  "source": "procgen_a-wide-flat-illustration-hero-sc_pg-cdfadfbc.py",
-  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-cdfadfbc/meta.json",
-  "created": 1793837022.996,
-  "reroll": "/procgen reroll pg-cdfadfbc --seed <n>"
+  "source": "procgen_a-wide-flat-illustration-hero-sc_pg-1174e7b2.py",
+  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-1174e7b2/meta.json",
+  "created": 1793839816.059,
+  "reroll": "/procgen reroll pg-1174e7b2 --seed <n>"
 }

@@ -1,5 +1,5 @@
 {
-  "id": "pg-89c7e590",
+  "id": "pg-30ef472f",
   "prompt": "A low-poly dark fantasy monster called THE HOLLOW WARDEN: hulking horned golem with glowing eyes and an ember crack in its chest, full body.",
   "seed": 339029,
   "width": 1024,
@@ -38,8 +38,8 @@
     }
   },
   "media": "image",
-  "source": "procgen_a-low-poly-dark-fantasy-monster_pg-89c7e590.py",
-  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-89c7e590/meta.json",
-  "created": 1793837019.103,
-  "reroll": "/procgen reroll pg-89c7e590 --seed <n>"
+  "source": "procgen_a-low-poly-dark-fantasy-monster_pg-30ef472f.py",
+  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-30ef472f/meta.json",
+  "created": 1793839813.085,
+  "reroll": "/procgen reroll pg-30ef472f --seed <n>"
 }

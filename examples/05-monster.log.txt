@@ -1,8 +1,8 @@
-pg-89c7e590  generate  image  1024x1024  seed=339029  style=dark-fantasy-lowpoly/dark-fantasy-lowpoly  renderer=python
+pg-30ef472f  generate  image  1024x1024  seed=339029  style=dark-fantasy-lowpoly/dark-fantasy-lowpoly  renderer=python
   prompt:  A low-poly dark fantasy monster called THE HOLLOW WARDEN: hulking horned golem with glowing eyes and an ember crack in its chest, full body.
-  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_a-low-poly-dark-fantasy-monster_pg-89c7e590.png
-  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-89c7e590/source.py
-  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-89c7e590/meta.json
+  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_a-low-poly-dark-fantasy-monster_pg-30ef472f.png
+  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-30ef472f/source.py
+  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-30ef472f/meta.json
   critic:  1 attempt(s), final score 8, mode vision
     #1: score 8 pass
   model:   custom/replay  calls=2 tokens=3000

@@ -1,5 +1,5 @@
 {
-  "id": "pg-3becc840",
+  "id": "pg-1af4671d",
   "prompt": "A logo and wordmark for a developer tools startup called forgeline, tagline 'SHIP AGENTS, NOT GLUE': a hexagon mark with a terminal prompt glyph.",
   "seed": 27874,
   "width": 1024,
@@ -38,8 +38,8 @@
     }
   },
   "media": "image",
-  "source": "procgen_a-logo-and-wordmark-for-a-develo_pg-3becc840.py",
-  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-3becc840/meta.json",
-  "created": 1793837015.718,
-  "reroll": "/procgen reroll pg-3becc840 --seed <n>"
+  "source": "procgen_a-logo-and-wordmark-for-a-develo_pg-1af4671d.py",
+  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-1af4671d/meta.json",
+  "created": 1793839810.492,
+  "reroll": "/procgen reroll pg-1af4671d --seed <n>"
 }

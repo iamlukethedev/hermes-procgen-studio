@@ -1,0 +1,9 @@
+pg-730aebf9  generate  video  720x720  seed=580722  style=brand-minimal/brand-minimal  renderer=python
+  prompt:  Animate a logo reveal for forgeline: the hexagon outline draws on, the prompt glyph slides in, the sparkle pops, then the wordmark fades up.
+  output:  /home/ubuntu/.hermes/cache/generated/videos/procgen_animate-a-logo-reveal-for-forgel_pg-730aebf9.mp4
+  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-730aebf9/source.py
+  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-730aebf9/meta.json
+  critic:  1 attempt(s), final score 8, mode vision
+    #1: score 8 pass
+  model:   custom/replay  calls=2 tokens=3000
+  gif:     /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-730aebf9/video.gif

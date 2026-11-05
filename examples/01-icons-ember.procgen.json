@@ -1,5 +1,5 @@
 {
-  "id": "pg-7cd4dfc0",
+  "id": "pg-6603a0a7",
   "prompt": "Generate a set of 4 game icons on rounded tiles: a sword, a health potion, a shield and a key.",
   "seed": 427615,
   "width": 1024,
@@ -9,7 +9,7 @@
     "name": "project",
     "palette": "ember",
     "source": "file",
-    "path": "/tmp/procgen-e2e-k91c/STYLE.md",
+    "path": "/tmp/procgen-e2e-Ekn9/STYLE.md",
     "fingerprint": "dbd9636b753c",
     "renderer": "auto",
     "colors": {
@@ -38,8 +38,8 @@
     }
   },
   "media": "image",
-  "source": "procgen_generate-a-set-of-4-game-icons-o_pg-7cd4dfc0.py",
-  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-7cd4dfc0/meta.json",
-  "created": 1793837004.668,
-  "reroll": "/procgen reroll pg-7cd4dfc0 --seed <n>"
+  "source": "procgen_generate-a-set-of-4-game-icons-o_pg-6603a0a7.py",
+  "record": "/home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-6603a0a7/meta.json",
+  "created": 1793839801.924,
+  "reroll": "/procgen reroll pg-6603a0a7 --seed <n>"
 }

@@ -199,6 +199,8 @@ sent to your model as a composition reference.
 
 ## Video
 
+![Animated logo reveal](examples/07-logo-motion.gif)
+
 With `video_gen.provider: procgen-studio`, `video_generate` asks for a `draw(t)` program that
 animates over `t ∈ [0, 1]`, critiques a strip of three frames, renders every frame in the
 sandbox and encodes MP4 (plus a GIF) with ffmpeg. Pass a Procgen Studio image as `image_url` to
@@ -212,14 +214,18 @@ critic score, its source code, and **Re-roll** / **Random** buttons that re-run 
 A command palette entry re-rolls the latest render. Like every Desktop plugin half it ships opt-in:
 enable it under Capabilities → Plugins.
 
+Under `plugins.isolation: host` Hermes does not wire plugin terminal subcommands, so use
+`/procgen ...` in a session instead of `hermes procgen ...`; everything else works the same.
+
 ## Limits
 
 - **No blur.** cairosvg ignores SVG filters, so glows, halos, fog and soft shadows are built from
   radial/linear gradients fading to transparent (the prompts teach this).
 - **Not photorealism.** Requests for photos come out as stylised illustrations.
-- **Model-dependent.** The drawing is only as good as the model writing it. Frontier coding
-  models produce the gallery-level results; small local models produce simpler drawings, and the
-  critic plus repair loop catch the worst failures.
+- **Model-dependent.** The drawing is only as good as the model writing it. Strong coding models
+  are what the gallery is aimed at; small local models produce much simpler drawings (see
+  [`examples/local-model-check`](examples/local-model-check/README.md)), and the critic, the
+  repair loop and the copy guard catch the worst failures.
 - **Text** uses system fonts through font stacks (`Inter, DejaVu Sans, sans-serif`, ...), so exact
   typefaces depend on what is installed.
 - **Pixel art** goes through the pixel-grid spec (`renderer=pixel`), which is reliable for sprites

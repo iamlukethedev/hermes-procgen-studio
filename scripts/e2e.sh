@@ -44,19 +44,34 @@ EOF
 sed -i.bak 's/^palette: .*/palette: ember/' "$PROJECT/STYLE.md" && rm -f "$PROJECT/STYLE.md.bak"
 mkdir -p "$OUT"
 
-collect() {  # collect <name>: copy the newest render's PNG, source and metadata into examples/
-  local name="$1" line png stem dir
-  line="$(cd "$PROJECT" && hermes procgen show last | grep '^  output:' | sed 's/^  output:  //')"
-  png="$line"
-  stem="${png%.png}"
-  dir="$(dirname "$png")"
-  cp "$png" "$OUT/$name.png"
+pg() {  # pg <args...>: run a procgen command (terminal subcommand, or the slash command under plugin-host isolation)
+  if (cd "$PROJECT" && hermes procgen "$@") 2>/dev/null; then return 0; fi
+  (cd "$PROJECT" && hermes -z "/procgen $*")
+}
+
+latest() {  # latest <field>: a field of the newest render record
+  python3 - "$1" <<PY
+import sys
+sys.path.insert(0, "$REPO")
+from procgen_studio import store
+rec = store.latest(1)[0]
+print({"published": rec.published, "id": rec.id, "gif": rec.extra.get("gif") or ""}[sys.argv[1]])
+PY
+}
+
+collect() {  # collect <name>: copy the newest render's output, source and metadata into examples/
+  local name="$1" out stem ext
+  out="$(latest published)"
+  ext="${out##*.}"
+  stem="${out%.*}"
+  cp "$out" "$OUT/$name.$ext"
   for side in "$stem".py "$stem".svg "$stem".pixel.json; do
     [[ -f "$side" ]] && cp "$side" "$OUT/$name.${side#"$stem".}"
   done
   cp "$stem.procgen.json" "$OUT/$name.procgen.json"
-  (cd "$PROJECT" && hermes procgen show last) >"$OUT/$name.log.txt"
-  echo "  -> examples/$name.png"
+  [[ -f "$stem.gif" ]] && cp "$stem.gif" "$OUT/$name.gif"
+  pg show "$(latest id)" >"$OUT/$name.log.txt"
+  echo "  -> examples/$name.$ext"
 }
 
 ask() {  # ask <name> <prompt>
@@ -79,8 +94,14 @@ ask 04-logo "A logo and wordmark for a developer tools startup called forgeline,
 ask 05-monster "A low-poly dark fantasy monster called THE HOLLOW WARDEN: hulking horned golem with glowing eyes and an ember crack in its chest, full body. [style=dark-fantasy-lowpoly]"
 
 say "Local re-roll of the scene with a new seed (no model call)"
-(cd "$PROJECT" && hermes procgen reroll "$(grep -o 'pg-[0-9a-f]\{8\}' "$OUT/03-scene.procgen.json" | head -1)" --seed 7)
+pg reroll "$(grep -o 'pg-[0-9a-f]\{8\}' "$OUT/03-scene.procgen.json" | head -1)" --seed 7
 collect 06-scene-reroll-seed7
+
+if [[ "${E2E_VIDEO:-1}" == "1" ]]; then  # the plugin reports a missing ffmpeg as a tool error
+  hermes config set video_gen.provider procgen-studio >/dev/null
+  hermes tools enable video_gen >/dev/null 2>&1 || true
+  ask 07-logo-motion "Animate a logo reveal for forgeline: the hexagon outline draws on, the prompt glyph slides in, the sparkle pops, then the wordmark fades up. [style=brand-minimal]"
+fi
 
 if [[ "${#restore[@]}" -gt 0 ]]; then
   say "Restoring your model settings"
