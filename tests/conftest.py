@@ -125,7 +125,9 @@ class _Result:
 class FakeLlm:
     """Stands in for ctx.llm: scripted drawing replies and scripted critic verdicts."""
 
-    def __init__(self, drawings: List[str], critiques: Optional[List[Any]] = None, *, vision_error: bool = False):
+    def __init__(self, drawings: List[str], critiques: Optional[List[Any]] = None, *, vision_error: bool = False,
+                 vary: bool = True):
+        self.vary = vary
         self.drawings = list(drawings)
         self.critiques = list(critiques or [])
         self.vision_error = vision_error
@@ -137,6 +139,10 @@ class FakeLlm:
         if not self.drawings:
             raise AssertionError("FakeLlm ran out of scripted drawings (unbounded loop?)")
         text = self.drawings.pop(0) if len(self.drawings) > 1 else self.drawings[0]
+        if self.vary and text.rstrip().endswith("```"):
+            # Real models rarely repeat a draft byte for byte; tag each one so the loop sees new code.
+            head, _, tail = text.rstrip().rpartition("```")
+            text = f"{head.rstrip()}\n# draft {len(self.complete_calls)}\n```{tail}\n"
         return _Result(text)
 
     def complete_structured(self, *, instructions, input, **kw):

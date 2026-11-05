@@ -220,3 +220,11 @@ def test_copy_guard_rules():
     assert "near copy" in copied_reference(technique("icon_tiles.py"), "four icons: bow, arrow, quiver, helmet")
     assert copied_reference(technique("icon_tiles.py"), "icons: sword, potion, shield, key") is None
     assert copied_reference("def draw(t):\n    return svg_doc('')", "anything") is None
+
+
+def test_identical_redraw_stops_the_loop(make_engine):
+    llm = FakeLlm([GOOD], [FAIL], vary=False)
+    engine, _ = make_engine(llm, max_redraws=4)
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
+    assert len(llm.complete_calls) == 2 and len(llm.structured_calls) == 1
+    assert "repeated an earlier program" in out.record.extra["stopped_early"]

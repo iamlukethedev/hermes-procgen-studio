@@ -90,6 +90,7 @@ Desktop app under Settings → Plugins):
 | `allow_python` | `true` | Off restricts the model to literal SVG and pixel specs (no code runs) |
 | `output_dir` | | Also copy every PNG + source + metadata into this folder |
 | `render_timeout` | `90` | Seconds a drawing program may run |
+| `time_budget` | `360` | Seconds per image; redraws stop early and the best attempt is returned (0 = no limit) |
 | `llm_timeout`, `max_tokens` | `300`, `16000` | Per drawing call |
 | `fps`, `video_seconds`, `gif` | `24`, `4`, `true` | Video defaults |
 
@@ -103,6 +104,12 @@ registers two auxiliary slots you can pin separately in `hermes model` → *Conf
 models* (or the Desktop Models page): **Procgen Studio drawing** (`procgen_draw`, a strong coding
 model helps most) and **Procgen Studio critic** (`procgen_critic`, which follows Hermes's vision
 slot until you pin it).
+
+**Slow or local models.** Hermes stops any tool call after `timeouts.tools.sequential_call`
+(420 s by default). Procgen Studio keeps each image inside `time_budget` by measuring its own
+model calls and skipping redraws (or the critic) that would not fit, so you get the best attempt
+instead of a timeout. For a slow local model raise both, for example
+`hermes config set timeouts.tools.sequential_call 1800` and `time_budget 1700`.
 
 The image model picker offers three tiers: `procgen-studio` (critic + up to `max_redraws`),
 `procgen-fast` (no critic) and `procgen-careful` (3+ redraws, stricter pass score).

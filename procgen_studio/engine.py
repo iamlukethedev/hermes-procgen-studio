@@ -464,9 +464,16 @@ class Engine:
         text = self._call_draw(llm, system, first_user, "draw")
         program, error = self._extract(text, s.allow_python)
         best: Optional[Tuple[Program, Any, Any]] = None
+        seen: set = set()
         for n in range(1, budget + 2):
             started = time.monotonic()
             result = None
+            if program is not None and n > 1 and hash(program.code.strip()) in seen:
+                rec.extra["stopped_early"] = f"attempt {n} repeated an earlier program unchanged"
+                logger.info("procgen %s: %s", rec.id, rec.extra["stopped_early"])
+                break
+            if program is not None:
+                seen.add(hash(program.code.strip()))
             if program is not None:
                 try:
                     result = run_program(program, width=req.width, height=req.height, seed=req.seed,
