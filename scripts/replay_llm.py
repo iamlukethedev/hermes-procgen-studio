@@ -51,6 +51,33 @@ def _aspect(prompt: str) -> str:
     return "square"
 
 
+def _find_result(raw: str):
+    """Pull the image/video path (or error) out of a tool result, however deeply it is wrapped."""
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        m = re.search(r'"(?:image|video)"\s*:\s*"([^"]+)"', raw)
+        return m.group(1) if m else raw[:300]
+    stack = [value]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            for key in ("image", "video"):
+                if isinstance(node.get(key), str):
+                    return node[key]
+            if node.get("success") is False and node.get("error"):
+                return f"error: {node['error']}"
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+        elif isinstance(node, str) and node.strip().startswith("{"):
+            try:
+                stack.append(json.loads(node))
+            except ValueError:
+                pass
+    return raw[:300]
+
+
 def _drawing(messages) -> str:
     user = _text(messages[-1].get("content"))
     m = re.search(r"(?:REQUEST|ORIGINAL REQUEST|USER REQUEST):\s*(.+)", user)
@@ -81,28 +108,31 @@ def respond(body: dict) -> dict:
         return {"content": _drawing(messages)}
     if "art director" in all_text:
         return {"content": _critique()}
-    if tools and ("image_generate" in tool_names or "video_generate" in tool_names):
+    direct = "image_generate" in tool_names or "video_generate" in tool_names
+    if tools and (direct or "tool_call" in tool_names):
         last = messages[-1] if messages else {}
         if last.get("role") == "tool":
-            try:
-                payload = json.loads(_text(last.get("content")))
-            except ValueError:
-                payload = {}
-            out = payload.get("image") or payload.get("video") or payload.get("error")
-            LOG.append({"kind": "final", "result": str(out)[:200]})
+            raw = _text(last.get("content"))
+            out = _find_result(raw)
+            LOG.append({"kind": "final", "result": str(out)[:300]})
             return {"content": f"Done: {out}"}
         user = next((_text(m.get("content")) for m in reversed(messages) if m.get("role") == "user"), "")
-        wants_video = "video_generate" in tool_names and re.search(r"\b(animate|animated|video|mp4|motion)\b",
-                                                                   user, re.I)
+        wants_video = re.search(r"\b(animate|animated|video|mp4|motion)\b", user, re.I)
         name = "video_generate" if wants_video else "image_generate"
         args = {"prompt": user.strip()}
         if name == "image_generate":
             args["aspect_ratio"] = _aspect(user)
         else:
             args.update(aspect_ratio="1:1", duration=3, resolution="720p")
-        LOG.append({"kind": "tool_call", "tool": name, "args": args})
+        if name in tool_names:
+            call_name, call_args = name, args
+        else:  # deferred behind Hermes's Tool Search bridge
+            call_name, call_args = "tool_call", {"calls": [{"name": name, "arguments": args}]}
+        LOG.append({"kind": "tool_call", "tool": call_name, "target": name, "args": args})
         return {"tool_calls": [{"id": f"call_{uuid.uuid4().hex[:8]}", "type": "function",
-                                "function": {"name": name, "arguments": json.dumps(args)}}]}
+                                "function": {"name": call_name, "arguments": json.dumps(call_args)}}]}
+    LOG.append({"kind": "other", "tools": sorted(n for n in tool_names if n)[:40],
+                "roles": [m.get("role") for m in messages][-6:], "head": all_text[:160]})
     return {"content": "Procgen Studio demo"}
 
 
