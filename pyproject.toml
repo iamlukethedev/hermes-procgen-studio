@@ -1,0 +1,23 @@
+[project]
+name = "hermes-procgen-studio"
+version = "0.1.0"
+description = "Procgen Studio: a Hermes Agent image/video backend that draws with code and renders locally"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Lucas", email = "252071647+iamlukethedev@users.noreply.github.com" }]
+dependencies = [
+    "cairosvg>=2.7,<3",
+    "numpy>=1.26,<3",
+    "pillow>=10.0,<14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[project.urls]
+Homepage = "https://github.com/iamlukethedev/hermes-procgen-studio"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

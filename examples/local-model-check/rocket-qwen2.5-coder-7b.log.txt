@@ -1,0 +1,9 @@
+pg-f5dc4e7f  generate  image  1024x1024  seed=881049  style=brand-minimal/brand-minimal  renderer=python  set=live-local
+  prompt:  A single app icon: a paper rocket ship launching diagonally on a rounded square tile, with a soft glow and a small star.
+  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_a-single-app-icon-a-paper-rocket_pg-f5dc4e7f.png
+  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-f5dc4e7f/source.py
+  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-f5dc4e7f/meta.json
+  critic:  2 attempt(s), final score 6, mode structure
+    #1: score 6 redraw (The render is blank or nearly blank, with a very low contrast and low palette adherence.; The requested subjects (paper rocket ship, rounded square tile, soft g)
+    #2: score 6 redraw (The render is blank or nearly blank, with a very low contrast and low palette adherence.; The requested subjects (paper rocket ship, rounded square tile, soft g)
+  model:   custom/qwen2.5-coder:7b  calls=4 tokens=20162

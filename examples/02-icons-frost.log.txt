@@ -1,0 +1,8 @@
+pg-9a0c081f  generate  image  1024x1024  seed=804527  style=project/frost  renderer=python  set=dungeon-loot
+  prompt:  Generate a set of 4 game icons on rounded tiles: a sword, a health potion, a shield and a key.
+  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_generate-a-set-of-4-game-icons-o_pg-9a0c081f.png
+  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-9a0c081f/source.py
+  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-9a0c081f/meta.json
+  critic:  1 attempt(s), final score 8, mode vision
+    #1: score 8 pass
+  model:   custom/replay  calls=2 tokens=3000

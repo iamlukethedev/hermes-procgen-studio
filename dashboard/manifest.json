@@ -1,0 +1,6 @@
+{
+  "name": "procgen-studio",
+  "label": "Procgen Studio",
+  "description": "Browse Procgen Studio renders, read their source and re-roll seeds locally.",
+  "api": "plugin_api.py"
+}

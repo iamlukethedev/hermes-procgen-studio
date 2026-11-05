@@ -1,0 +1,5 @@
+pg-1174e7b2  reroll  image  1536x1024  seed=7  style=flat-illustration/flat-illustration  renderer=python  parent=pg-b461a5a6
+  prompt:  A wide flat-illustration hero scene: a cabin in a moonlit pine forest at night, warm windows, a path leading to the door, layered hills and fog.
+  output:  /home/ubuntu/.hermes/cache/generated/images/procgen_a-wide-flat-illustration-hero-sc_pg-1174e7b2.png
+  source:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-1174e7b2/source.py
+  record:  /home/ubuntu/.hermes/plugin-data/procgen-studio/renders/pg-1174e7b2/meta.json
