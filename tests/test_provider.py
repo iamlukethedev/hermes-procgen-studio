@@ -67,10 +67,10 @@ def test_aspect_ratio_sizes_and_2k():
     p = registered().image_providers[0]
     from PIL import Image
     for aspect, size in (("landscape", (1536, 1024)), ("portrait", (1024, 1536)), ("nonsense", (1536, 1024))):
-        res = p.generate("a logo", aspect)
+        res = p.generate("a logo for forgeline", aspect)
         with Image.open(res["image"]) as im:
             assert im.size == size
-    res = p.generate("a logo", "square", resolution="2K")
+    res = p.generate("a logo for forgeline", "square", resolution="2K")
     with Image.open(res["image"]) as im:
         assert im.size == (2048, 2048)
 
@@ -82,7 +82,7 @@ def test_error_contract():
     bad = registered(FakeLlm([fenced("def draw(t):\n    return nope")], [PASS]), max_redraws=1).image_providers[0]
     res = bad.generate("a logo", "square")
     assert res["success"] is False and res["error_type"] == "render_failed" and "nope" in res["error"]
-    style_err = registered().image_providers[0].generate("a logo [style=does-not-exist]", "square")
+    style_err = registered().image_providers[0].generate("a logo for forgeline [style=does-not-exist]", "square")
     assert style_err["success"] is False and style_err["error_type"] == "invalid_style"
 
 
@@ -120,7 +120,7 @@ def test_foreign_image_url_is_sent_as_a_reference(tmp_path):
 def test_output_dir_receives_a_project_copy(tmp_path):
     out_dir = tmp_path / "assets"
     p = registered(output_dir=str(out_dir)).image_providers[0]
-    res = p.generate("a logo", "square")
+    res = p.generate("a logo for forgeline", "square")
     pngs = list(out_dir.glob("*.png"))
     assert len(pngs) == 1 and pngs[0].with_suffix(".py").exists()
     assert res["render_id"] in pngs[0].name

@@ -31,6 +31,39 @@ _TECHNIQUES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 
 _KIND_FENCE = {"python": "python", "pixel": "pixel"}
 
+# What each reference draws: text it bakes in, and the subject words a request would use for it.
+# Used to catch a model that pastes a reference instead of drawing the request.
+REFERENCE_FINGERPRINTS: Dict[str, Tuple[Tuple[str, ...], Tuple[str, ...]]] = {
+    "icon_tiles.py": ((), ("sword", "potion", "shield", "key")),
+    "brand_mark.py": (("forgeline", "SHIP AGENTS"), ("forgeline",)),
+    "logo_motion.py": (("forgeline", "SHIP AGENTS"), ("forgeline",)),
+    "lowpoly_creature.py": (("HOLLOW WARDEN",), ("warden", "golem", "monster", "creature", "demon", "beast")),
+    "layered_scene.py": ((), ("cabin", "forest", "moon", "night", "pine")),
+    "topo_pattern.py": ((), ("topo", "topographic", "contour", "map", "terrain")),
+    "pixel_sprite.pixel.json": (("KNIGHT - WALK",), ("knight",)),
+}
+
+
+def copied_reference(code: str, request: str, *, threshold: float = 0.8) -> Optional[str]:
+    """Return an issue if the program is a reference pasted in place of the request, else None."""
+    import difflib
+    low_code, low_req = code.lower(), request.lower()
+    for name, (literals, subject) in REFERENCE_FINGERPRINTS.items():
+        words = tuple(w.lower() for w in literals + subject)
+        if any(re.search(rf"(?<![a-z]){re.escape(w)}(?![a-z])", low_req) for w in words):
+            continue  # the request is about this reference's own subject
+        for literal in literals:
+            if literal.lower() in low_code:
+                return (f"the drawing contains '{literal}' from the {name} technique reference; the request never "
+                        f"asked for it. Draw the requested subject and text, not the reference's")
+        ref = _technique_text(name, max_chars=10**6)
+        a = [ln.strip() for ln in code.splitlines() if ln.strip()]
+        b = [ln.strip() for ln in ref.splitlines() if ln.strip()]
+        if len(a) >= 8 and difflib.SequenceMatcher(None, a, b, autojunk=False).ratio() >= threshold:
+            return (f"the program is a near copy of the {name} technique reference instead of a drawing of the "
+                    f"request; design the requested subject from scratch")
+    return None
+
 
 def _technique_text(name: str, max_chars: int = 9000) -> str:
     text = (TECHNIQUES_DIR / name).read_text(encoding="utf-8")
@@ -172,7 +205,9 @@ def system_prompt(req: DrawRequest, *, techniques: Optional[Sequence[str]] = Non
         parts.append("PYTHON IS DISABLED for this install: reply with ```svg or ```pixel only.")
     names = list(techniques) if techniques is not None else pick_techniques(req.prompt, req.style, animated=req.animated)
     if names:
-        parts.append("TECHNIQUE REFERENCES (study how they are built; do not copy their subject matter):")
+        parts.append("TECHNIQUE REFERENCES: study HOW they are built (layering, gradients, shading, use of PAL and rng). "
+                     "They are NOT the request. Never reuse their subjects, names, text, shapes or layout; "
+                     "a reply that pastes a reference is rejected automatically.")
         for name in names:
             fence = "pixel" if name.endswith(".json") else "python"
             parts.append(f"--- {name} ---\n```{fence}\n{_technique_text(name)}\n```")
@@ -195,6 +230,8 @@ def user_prompt(req: DrawRequest) -> str:
     elif req.style.renderer in _KIND_FENCE and not req.animated:
         if req.style.renderer == "pixel" or re.search(r"pixel|sprite|8-bit|16-bit", req.prompt, re.I):
             lines += ["", f"Use the ```{_KIND_FENCE[req.style.renderer]} output format."]
+    lines += ["", "Draw exactly the REQUEST above: its subjects, its count, its text. The technique references "
+                  "only show how to build things; none of their content belongs in this drawing."]
     if req.animated:
         loop_hint = "The last frame must match the first so it loops seamlessly." if req.loop else \
             "End on a clean, finished hero frame and hold it."

@@ -30,7 +30,7 @@ def test_first_render_passes_with_one_draw_and_one_review(make_engine):
 def test_failing_critic_is_bounded_by_max_redraws(make_engine, max_redraws):
     llm = FakeLlm([GOOD], [FAIL])
     engine, _ = make_engine(llm, max_redraws=max_redraws)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert len(llm.complete_calls) == 1 + max_redraws
     assert len(llm.structured_calls) == 1 + max_redraws
     assert len(out.record.critic) == 1 + max_redraws
@@ -41,7 +41,7 @@ def test_failing_critic_is_bounded_by_max_redraws(make_engine, max_redraws):
 def test_redraw_prompt_carries_critic_issues_and_best_attempt_wins(make_engine):
     llm = FakeLlm([GOOD, GOOD, GOOD], [dict(FAIL, score=6), dict(FAIL, score=3), dict(PASS, score=8)])
     engine, _ = make_engine(llm, max_redraws=2)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     redraw_user = llm.complete_calls[1]["messages"][1]["content"]
     assert "the key is missing" in redraw_user and "CURRENT PROGRAM" in redraw_user
     assert out.verdict.score == 8 and out.verdict.passed
@@ -52,7 +52,7 @@ def test_redraw_prompt_carries_critic_issues_and_best_attempt_wins(make_engine):
 def test_best_scoring_attempt_is_kept_when_all_fail(make_engine):
     llm = FakeLlm([GOOD, GOOD, GOOD], [dict(FAIL, score=6), dict(FAIL, score=2), dict(FAIL, score=5)])
     engine, _ = make_engine(llm, max_redraws=2)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert out.verdict.score == 6
     attempt_one = Path(out.record.dir / "attempts" / "01" / "frame_0000.png").read_bytes()
     assert Path(out.record.output).read_bytes() == attempt_one
@@ -61,7 +61,7 @@ def test_best_scoring_attempt_is_kept_when_all_fail(make_engine):
 def test_render_error_triggers_repair_with_traceback(make_engine):
     llm = FakeLlm([BROKEN, GOOD], [PASS])
     engine, _ = make_engine(llm, max_redraws=2)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     repair_user = llm.complete_calls[1]["messages"][1]["content"]
     assert "missing_variable" in repair_user and "failed to render" in repair_user
     assert out.record.critic[0]["ok"] is False
@@ -72,7 +72,7 @@ def test_render_error_triggers_repair_with_traceback(make_engine):
 def test_reply_without_code_is_repaired(make_engine):
     llm = FakeLlm(["I'd love to draw that! Imagine a sword...", GOOD], [PASS])
     engine, _ = make_engine(llm)
-    out = engine.generate("a sword icon", aspect_ratio="square")
+    out = engine.generate("a sword, potion, shield and key icon set", aspect_ratio="square")
     assert out.verdict.passed and len(llm.complete_calls) == 2
 
 
@@ -80,7 +80,7 @@ def test_every_attempt_failing_raises_after_budget(make_engine):
     llm = FakeLlm([BROKEN], [PASS])
     engine, _ = make_engine(llm, max_redraws=2)
     with pytest.raises(GenerationError) as exc:
-        engine.generate("a sword icon", aspect_ratio="square")
+        engine.generate("a sword, potion, shield and key icon set", aspect_ratio="square")
     assert len(llm.complete_calls) == 3
     assert len(exc.value.history) == 3
 
@@ -88,7 +88,7 @@ def test_every_attempt_failing_raises_after_budget(make_engine):
 def test_blank_render_fails_without_spending_a_critic_call(make_engine):
     llm = FakeLlm([BLANK, GOOD], [PASS])
     engine, _ = make_engine(llm, max_redraws=1)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert out.record.critic[0]["mode"] == "auto" and out.record.critic[0]["score"] == 0
     assert len(llm.structured_calls) == 1, "only the second (non-blank) render is reviewed by the model"
     assert out.verdict.passed
@@ -97,7 +97,7 @@ def test_blank_render_fails_without_spending_a_critic_call(make_engine):
 def test_vision_failure_falls_back_to_structure_critique(make_engine):
     llm = FakeLlm([GOOD], [PASS], vision_error=True)
     engine, _ = make_engine(llm)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert [c["has_image"] for c in llm.structured_calls] == [True, False]
     assert out.verdict.mode == "structure"
     assert "vision critique unavailable" in out.verdict.note
@@ -106,25 +106,25 @@ def test_vision_failure_falls_back_to_structure_critique(make_engine):
 def test_structure_mode_sends_the_program(make_engine):
     llm = FakeLlm([GOOD], [PASS])
     engine, _ = make_engine(llm, critic="structure")
-    engine.generate("four game icons", aspect_ratio="square")
+    engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert llm.structured_calls[0]["has_image"] is False
 
 
 def test_critic_off_and_fast_model_skip_review(make_engine):
     llm = FakeLlm([GOOD], [FAIL])
     engine, _ = make_engine(llm, critic="off")
-    engine.generate("four game icons", aspect_ratio="square")
+    engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert llm.structured_calls == []
     llm2 = FakeLlm([GOOD], [FAIL])
     engine2, _ = make_engine(llm2)
-    engine2.generate("four game icons", aspect_ratio="square", model="procgen-fast")
+    engine2.generate("four game icons: sword, potion, shield, key", aspect_ratio="square", model="procgen-fast")
     assert llm2.structured_calls == []
 
 
 def test_critic_exception_accepts_render_instead_of_failing(make_engine):
     llm = FakeLlm([GOOD], [RuntimeError("critic provider down")])
     engine, _ = make_engine(llm, critic="structure")
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert Path(out.record.output).is_file()
     assert "structure critique failed" in out.verdict.note
 
@@ -132,7 +132,7 @@ def test_critic_exception_accepts_render_instead_of_failing(make_engine):
 def test_critic_log_is_persisted(make_engine):
     llm = FakeLlm([GOOD, GOOD], [FAIL, PASS])
     engine, _ = make_engine(llm)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     meta = json.loads((out.record.dir / "meta.json").read_text())
     assert [h["passed"] for h in meta["critic"]] == [False, True]
     assert meta["llm"]["calls"] == 4
@@ -152,7 +152,7 @@ def test_directives_are_parsed_and_stripped():
 def test_seed_directive_and_style_directive_apply(make_engine):
     llm = FakeLlm([GOOD], [PASS])
     engine, _ = make_engine(llm)
-    out = engine.generate("four game icons [seed=99] [style=frost] [set=loot]", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key [seed=99] [style=frost] [set=loot]", aspect_ratio="square")
     assert out.record.seed == 99 and out.record.style["palette"] == "frost" and out.record.set == "loot"
     user = llm.complete_calls[0]["messages"][1]["content"]
     assert "SEED=99" in user and "frost" in user and "[seed" not in user
@@ -176,7 +176,7 @@ def test_time_budget_stops_redraws_and_keeps_best_attempt(make_engine, monkeypat
     monkeypatch.setattr(eng, "ROUND_MARGIN", 0.5)
     llm = SlowLlm([GOOD], [FAIL], delay=1.0)
     engine, _ = make_engine(llm, max_redraws=6, time_budget=5)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert 1 <= len(llm.complete_calls) < 7, "redraws stop before the budget runs out"
     assert "time budget" in out.record.extra["stopped_early"]
     assert Path(out.record.output).is_file()
@@ -186,7 +186,7 @@ def test_time_budget_stops_redraws_and_keeps_best_attempt(make_engine, monkeypat
 def test_critic_skipped_when_budget_is_too_short(make_engine):
     llm = FakeLlm([GOOD], [FAIL])
     engine, _ = make_engine(llm, time_budget=5)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert llm.structured_calls == []
     assert out.verdict.mode == "skipped" and "time budget" in out.verdict.note
 
@@ -194,5 +194,29 @@ def test_critic_skipped_when_budget_is_too_short(make_engine):
 def test_time_budget_zero_means_unbounded_time(make_engine):
     llm = FakeLlm([GOOD], [FAIL])
     engine, _ = make_engine(llm, max_redraws=2, time_budget=0)
-    out = engine.generate("four game icons", aspect_ratio="square")
+    out = engine.generate("four game icons: sword, potion, shield, key", aspect_ratio="square")
     assert len(llm.complete_calls) == 3 and "stopped_early" not in out.record.extra
+
+
+def test_pasted_reference_is_rejected_and_redrawn(make_engine):
+    rocket = fenced("def draw(t):\n    body = f'<polygon points=\"{W*.3},{H*.7} {W*.5},{H*.2} {W*.7},{H*.7}\" fill=\"{PAL[\"accent\"]}\"/>'\n"
+                    "    return svg_doc(body, bg=PAL['bg'])")
+    llm = FakeLlm([fenced(technique("brand_mark.py")), rocket], [PASS])
+    engine, _ = make_engine(llm)
+    out = engine.generate("a paper rocket app icon", aspect_ratio="square")
+    first = out.record.critic[0]
+    assert first["mode"] == "auto" and not first["passed"] and "forgeline" in first["issues"][0]
+    assert "forgeline" in llm.complete_calls[1]["messages"][1]["content"]
+    assert len(llm.structured_calls) == 1, "the pasted reference was rejected without a model review"
+    assert out.verdict.passed
+
+
+def test_copy_guard_rules():
+    from procgen_studio.prompts import copied_reference
+    assert copied_reference(technique("brand_mark.py"), "a logo for forgeline") is None
+    assert "forgeline" in copied_reference(technique("brand_mark.py"), "a coffee shop logo")
+    assert copied_reference(technique("layered_scene.py"), "moonlit forest cabin") is None
+    assert "near copy" in copied_reference(technique("layered_scene.py"), "a desert city skyline at dusk")
+    assert "near copy" in copied_reference(technique("icon_tiles.py"), "four icons: bow, arrow, quiver, helmet")
+    assert copied_reference(technique("icon_tiles.py"), "icons: sword, potion, shield, key") is None
+    assert copied_reference("def draw(t):\n    return svg_doc('')", "anything") is None

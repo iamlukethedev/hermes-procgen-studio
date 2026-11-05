@@ -71,6 +71,10 @@ def review(llm, req: "prompts.DrawRequest", *, image: Path, code: str, kind: str
     """Return a verdict for one render. Never raises for model failures."""
     stats = image_stats(image, req.style.palette)
     hard = automatic_checks(stats)
+    copied = prompts.copied_reference(code, req.prompt)
+    if copied:
+        return Verdict(score=1, passed=False, mode="auto", issues=[copied] + hard,
+                       fixes=["start from the REQUEST: list its subjects, then design shapes for them"], stats=stats)
     if stats.get("looks_blank"):
         return Verdict(score=0, passed=False, mode="auto", issues=hard,
                        fixes=["make sure draw(t) returns the full composed document; check coordinates use W and H"],

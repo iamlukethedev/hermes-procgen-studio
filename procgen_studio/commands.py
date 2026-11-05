@@ -175,6 +175,7 @@ def _dispatch(engine: Engine, cmd: str, args) -> str:
         return "\n".join([
             "Procgen Studio",
             f"  style in effect: {style_line}",
+            f"  working dir:     {working_dir()}",
             f"  active set:      {engine.state.get('set') or '-'}",
             f"  critic:          {s.critic}, max redraws {s.max_redraws}, pass score {s.min_score}",
             f"  python programs: {'allowed (sandboxed)' if s.allow_python else 'disabled (SVG/pixel only)'}",

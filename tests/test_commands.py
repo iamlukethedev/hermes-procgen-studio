@@ -86,7 +86,7 @@ def test_style_commands_and_init(make_engine):
 def test_list_show_source_status_help(make_engine):
     engine, _ = make_engine(FakeLlm([fenced(technique("brand_mark.py"))], [PASS]))
     assert "No renders yet" in run(engine, "list")
-    out = engine.generate("a logo", aspect_ratio="square")
+    out = engine.generate("a logo for forgeline", aspect_ratio="square")
     assert out.record.id in run(engine, "list")
     shown = run(engine, "show last")
     assert out.record.id in shown and "seed=" in shown and "critic:" in shown
@@ -113,7 +113,7 @@ def test_render_local_file_and_gallery(make_engine, tmp_path):
     src.write_text(technique("topo_pattern.py"), encoding="utf-8")
     text = run(engine, f"render {src} --seed 3 --style frost --size 256x256")
     assert "Rendered" in text and src.with_suffix(".png").is_file()
-    engine.generate("a logo", aspect_ratio="square")
+    engine.generate("a logo for forgeline", aspect_ratio="square")
     assert "Gallery of 1" in run(engine, "gallery")
 
 
