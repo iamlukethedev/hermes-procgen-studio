@@ -140,7 +140,12 @@ def video_size(aspect_ratio: str, resolution: str) -> Tuple[int, int]:
 
 
 def working_dir() -> str:
-    return os.environ.get("TERMINAL_CWD") or os.getcwd()
+    """The conversation's workspace (one gateway serves many sessions, so not the process cwd)."""
+    try:
+        from agent.runtime_cwd import resolve_agent_cwd
+        return str(resolve_agent_cwd())
+    except Exception:
+        return os.environ.get("TERMINAL_CWD") or os.getcwd()
 
 
 class JsonState:
