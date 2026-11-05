@@ -37,7 +37,7 @@ image_generate(prompt) ─▶ Procgen Studio provider
                             │ STYLE.md + preset + prompt directives ─▶ style contract
                             │ technique references picked for the request (icons, scene, logo, ...)
                             ▼
-                          ctx.llm  ─▶  ```python def draw(t): ... return svg```   (your model)
+                          ctx.llm  ─▶  def draw(t): ... return svg     (your model writes this)
                             ▼
                           sandboxed render worker (separate process) ─▶ PNG
                             ▼

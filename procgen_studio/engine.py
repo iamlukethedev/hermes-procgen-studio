@@ -243,12 +243,17 @@ class Engine:
         s = self._settings()
         style = self._style_for(d, s, fallback=base)
         source = Path(base.source).read_text(encoding="utf-8")
+        seed = self._seed(d, style) if "seed" in d.values else base.seed
+        video = base.media == "video"
         req = prompts.DrawRequest(prompt=f"{base.prompt} -- edit: {d.prompt}", width=base.width, height=base.height,
-                                  seed=int(d.values.get("seed", base.seed)), style=style,
-                                  allow_python=s.allow_python)
+                                  seed=seed, style=style, allow_python=s.allow_python, animated=video,
+                                  frames=base.frames if video else 1, fps=base.fps or s.fps)
         policy = self._policy(s, thinking=thinking, model=model, directives=d)
         rec = self._new_record(req, base.aspect_ratio, d, media=base.media, operation="edit", parent=base)
         rec.extra["instruction"] = d.prompt
+        if video:
+            rec.fps, rec.frames = base.fps, base.frames
+            rec.extra.update({k: v for k, v in base.extra.items() if k.startswith("video_")})
         llm = self._llm_factory(s)
         system = prompts.system_prompt(req)
         user = prompts.edit_prompt(req, source, base.kind, d.prompt)
@@ -316,8 +321,10 @@ class Engine:
         s = self._settings()
         style = self._style_for(d, s, fallback=source_record)
         width, height = video_size(aspect_ratio, resolution)
-        fps = int(d.values.get("fps", s.fps))
-        fps = max(4, min(60, fps))
+        try:
+            fps = max(4, min(60, int(d.values.get("fps", s.fps))))
+        except ValueError:
+            fps = s.fps
         seconds = max(1, min(15, int(duration or s.video_seconds)))
         frames = fps * seconds
         if seed is not None and "seed" not in d.values:

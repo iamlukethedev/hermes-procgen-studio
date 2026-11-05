@@ -132,6 +132,10 @@ class ProcgenImageProvider(ImageGenProvider):
                     base = store.resolve_ref(sources[0])
                 except KeyError:
                     reference = sources[0]
+            if base is not None and base.media == "video":
+                return error_response(error=f"{base.id} is a video render; edit it with video_generate and "
+                                            f"image_url set to its path", error_type="invalid_input",
+                                      provider=self.name, model=model, prompt=prompt, aspect_ratio=aspect)
             if base is not None:
                 outcome = self.engine.edit(base, prompt, thinking=kwargs.get("thinking"), model=model)
             else:

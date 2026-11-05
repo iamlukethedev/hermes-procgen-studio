@@ -161,3 +161,16 @@ def test_hermes_abcs_in_use():
     import agent.image_gen_provider as m
     assert hasattr(m, "ImageGenProvider")
     print("real Hermes ABCs" if HERMES_REAL else "stand-in ABCs")
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_editing_a_video_render_goes_through_video_generate():
+    llm = FakeLlm([fenced(technique("logo_motion.py"))], [PASS])
+    ctx = registered(llm, fps=6)
+    video = ctx.video_providers[0].generate("animated forgeline logo", duration=1, aspect_ratio="1:1",
+                                            resolution="480p")
+    refused = ctx.image_providers[0].generate("make it green", "square", image_url=video["video"])
+    assert refused["success"] is False and "video_generate" in refused["error"]
+    again = ctx.video_providers[0].generate("make the sparkle bigger for forgeline", image_url=video["video"],
+                                            duration=1, aspect_ratio="1:1", resolution="480p")
+    assert again["success"] and again["frames"] == 6
