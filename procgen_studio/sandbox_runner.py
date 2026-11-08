@@ -42,6 +42,29 @@ _BLOCKED_MODULES = frozenset({
     "http", "xmlrpc", "socketserver", "asyncio", "requests", "httpx", "urllib3", "aiohttp", "paramiko",
 })
 
+# Attribute names that lead from an ordinary object back to frames, code objects, globals or the
+# stdlib. The AST check in procgen_studio.render refuses them as dotted attributes and import names;
+# the worker refuses them again when they arrive as strings (getattr, from-imports, star imports).
+FORBIDDEN_ATTRS = frozenset({
+    "gi_frame", "gi_code", "gi_yieldfrom", "cr_frame", "cr_code", "ag_frame", "ag_code", "f_back",
+    "f_globals", "f_locals", "f_builtins", "f_code", "tb_frame", "tb_next", "co_code", "func_globals",
+    "system", "popen", "spawn", "fork", "unlink", "rmdir", "rmtree",
+    # Library modules re-export the stdlib (PIL.Image.os, numpy.sys, ...).
+    "os", "sys", "subprocess", "builtins", "importlib", "shutil", "socket", "ctypes", "modules", "pathlib",
+    # operator.attrgetter("os") / methodcaller(...) are getattr by another name.
+    "attrgetter", "methodcaller",
+})
+
+# Dunders a class body may leave in its namespace. Anything else (__array_interface__, __getattr__,
+# __buffer__, __class_getitem__, ...) hooks a library protocol and is refused.
+CLASS_DUNDERS = frozenset({
+    "__module__", "__qualname__", "__doc__", "__init__", "__post_init__", "__annotations__",
+    "__annotate__", "__annotate_func__", "__annotations_cache__", "__firstlineno__",
+    "__static_attributes__", "__classcell__", "__orig_bases__", "__dict__", "__weakref__",
+    # Added by the stdlib itself for Enum and typing.NamedTuple subclasses.
+    "__new__", "__repr__", "__getnewargs__", "__match_args__", "__slots__",
+})
+
 _BLOCKED_EVENT_PREFIXES = (
     "socket.", "subprocess.", "os.system", "os.exec", "os.posix_spawn", "os.spawn", "os.fork",
     "os.forkpty", "os.kill", "os.killpg", "os.putenv", "os.unsetenv", "os.chmod", "os.chown",
@@ -68,8 +91,9 @@ SAFE_BUILTINS = (
 
 
 def _public_name(name) -> str:
-    if not isinstance(name, str) or name.startswith("_"):
-        raise AttributeError(f"attribute '{name}' is not available to drawing programs")
+    # Exact str only: a str subclass could override startswith/__eq__/__hash__ to slip past the checks.
+    if type(name) is not str or name.startswith("_") or name in FORBIDDEN_ATTRS:
+        raise AttributeError(f"attribute {name!r} is not available to drawing programs")
     return name
 
 
@@ -115,11 +139,43 @@ def _guarded_import_factory(real_import):
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
         if level != 0:
             raise ImportError("relative imports are not available to drawing programs")
+        if type(name) is not str:
+            raise ImportError("import names must be plain strings")
         top = name.split(".", 1)[0]
         if top not in ALLOWED_IMPORTS:
             raise ImportError(f"import of '{name}' is not allowed (allowed: {', '.join(sorted(ALLOWED_IMPORTS))})")
-        return real_import(name, globals, locals, fromlist, level)
+        fromlist = tuple(fromlist or ())
+        for item in fromlist:
+            if item != "*":
+                try:
+                    _public_name(item)
+                except AttributeError:
+                    raise ImportError(f"'from {name} import {item}' is not available to drawing programs") from None
+        module = real_import(name, globals, locals, fromlist, level)
+        if "*" in fromlist:
+            exported = getattr(module, "__all__", None)
+            if exported is None:
+                exported = [k for k in vars(module) if not k.startswith("_")]
+            bad = sorted(str(k) for k in exported if type(k) is not str or k.startswith("_") or k in FORBIDDEN_ATTRS)
+            if bad:
+                raise ImportError(f"'from {name} import *' would expose {', '.join(bad[:5])}; import names explicitly")
+        return module
     return guarded_import
+
+
+def _guarded_build_class_factory(real_build_class):
+    def build_class(func, name, *bases, **kwargs):
+        cls = real_build_class(func, name, *bases, **kwargs)
+        try:
+            names = list(vars(cls))
+        except TypeError:
+            raise TypeError(f"class {name!r} did not produce a class") from None
+        bad = sorted(k for k in names if type(k) is not str or
+                     (k.startswith("__") and k.endswith("__") and k not in CLASS_DUNDERS))
+        if bad:
+            raise TypeError(f"class {name!r} may not define {', '.join(map(str, bad[:5]))} in a drawing program")
+        return cls
+    return build_class
 
 
 def _install_audit_hook(job_dir: str, read_roots: list[str]) -> None:
@@ -133,13 +189,33 @@ def _install_audit_hook(job_dir: str, read_roots: list[str]) -> None:
             return False
         return any(real == b or real.startswith(b.rstrip(os.sep) + os.sep) for b in bases)
 
+    def as_text(path):
+        if isinstance(path, (str, bytes)):
+            return os.fsdecode(path)
+        try:
+            return os.fsdecode(os.fspath(path))
+        except (TypeError, ValueError):
+            return None
+
     def hook(event: str, args) -> None:
         if event in ("os.listdir", "os.scandir"):
             path = args[0] if args else "."
-            if isinstance(path, bytes):
-                path = path.decode("utf-8", "replace")
-            if isinstance(path, str) and not within(path, (job_dir,) + roots):
-                raise PermissionError(f"drawing programs may not list {path}")
+            if isinstance(path, int):
+                return
+            text = as_text(path)
+            if text is None or not within(text, (job_dir,) + roots):
+                raise PermissionError(f"drawing programs may not list {path!r}")
+            return
+        if event in ("os.mkdir", "os.utime"):
+            # os.makedirs goes through os.mkdir; both may only touch the job directory.
+            path = args[0] if args else None
+            dir_fd = args[-1] if len(args) > 1 else None
+            if isinstance(path, int) and event == "os.utime":
+                return
+            text = as_text(path)
+            relative_to_fd = dir_fd not in (None, -1) and text is not None and not os.path.isabs(text)
+            if text is None or relative_to_fd or not within(text, (job_dir,)):
+                raise PermissionError(f"drawing programs may only {event[3:]} inside the job directory, not {path!r}")
             return
         if event == "open":
             path = args[0]
@@ -147,10 +223,9 @@ def _install_audit_hook(job_dir: str, read_roots: list[str]) -> None:
             flags = args[2] if len(args) > 2 else 0
             if isinstance(path, int):
                 return
-            if isinstance(path, bytes):
-                path = path.decode("utf-8", "replace")
-            if not isinstance(path, str):
-                return
+            path = as_text(path)
+            if path is None:
+                raise PermissionError("drawing programs may only open files by path")
             write_flags = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
             if isinstance(mode, str):
                 writing = any(c in mode for c in "wax+")
@@ -332,6 +407,7 @@ def main(argv: list[str]) -> int:
         else:
             safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS if hasattr(builtins, name)}
             safe_builtins["__import__"] = _guarded_import_factory(real_import)
+            safe_builtins["__build_class__"] = _guarded_build_class_factory(builtins.__build_class__)
             safe_builtins.update(getattr=_safe_getattr, hasattr=_safe_hasattr, setattr=_safe_setattr)
             palette = dict(job.get("palette") or {})
             env = {

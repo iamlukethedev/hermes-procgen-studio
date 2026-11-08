@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from .sandbox_runner import FORBIDDEN_ATTRS
+
 RUNNER = Path(__file__).resolve().parent / "sandbox_runner.py"
 
 ALLOWED_IMPORTS = frozenset({
@@ -38,18 +40,17 @@ FORBIDDEN_NAMES = frozenset({
     "help", "exit", "quit", "memoryview", "__builtins__", "__loader__", "__spec__", "delattr",
 })
 
-# Attribute names that lead from an ordinary object back to frames, code objects or globals.
-FORBIDDEN_ATTRS = frozenset({
-    "gi_frame", "gi_code", "gi_yieldfrom", "cr_frame", "cr_code", "ag_frame", "ag_code", "f_back",
-    "f_globals", "f_locals", "f_builtins", "f_code", "tb_frame", "tb_next", "co_code", "func_globals",
-    "system", "popen", "spawn", "fork", "unlink", "rmdir", "rmtree",
-    # Library modules re-export the stdlib (PIL.Image.os, numpy.sys, ...).
-    "os", "sys", "subprocess", "builtins", "importlib", "shutil", "socket", "ctypes", "modules", "pathlib",
-})
-
+# Dunders a program may read as attributes (obj.__init__, ...). Defining, assigning or naming any
+# dunder is refused separately: a class body defining __array_interface__ or __getattr__ hooks
+# library protocols (numpy can be pointed at raw memory).
 ALLOWED_DUNDERS = frozenset({"__init__", "__name__", "__doc__", "__len__", "__iter__", "__next__",
                              "__getitem__", "__repr__", "__str__", "__call__", "__eq__", "__lt__",
                              "__hash__", "__post_init__", "__add__", "__mul__", "__sub__"})
+
+# The only dunder methods a drawing program may define.
+DEFINABLE_DUNDERS = frozenset({"__init__", "__post_init__"})
+
+_NAME_LOOKUP_BUILTINS = frozenset({"getattr", "hasattr", "setattr"})
 
 MAX_SOURCE_BYTES = 400 * 1024
 _FENCE_RE = re.compile(r"```([A-Za-z0-9_+\-]*)[^\n]*\n(.*?)```", re.DOTALL)
@@ -136,6 +137,16 @@ def _classify(lang: str, body: str) -> Optional[str]:
     return None
 
 
+def _is_dunder(name: str) -> bool:
+    return len(name) > 4 and name.startswith("__") and name.endswith("__")
+
+
+def _check_identifier(name: Optional[str], line: Any) -> None:
+    if name and _is_dunder(name):
+        raise ProgramError(f"line {line}: the name '{name}' is not available to drawing programs "
+                           f"(the only dunder methods a program may define are __init__ and __post_init__)")
+
+
 def check_python(code: str) -> None:
     """Static allowlist check run before the program ever reaches the worker."""
     try:
@@ -143,21 +154,58 @@ def check_python(code: str) -> None:
     except SyntaxError as exc:
         raise ProgramError(f"SyntaxError: {exc.msg} (line {exc.lineno})") from exc
     for node in ast.walk(tree):
+        line = getattr(node, "lineno", "?")
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.split(".")[0] not in ALLOWED_IMPORTS:
-                    raise ProgramError(f"line {node.lineno}: import of '{alias.name}' is not allowed")
+                    raise ProgramError(f"line {line}: import of '{alias.name}' is not allowed")
+                _check_identifier(alias.asname, line)
         elif isinstance(node, ast.ImportFrom):
             if node.level or not node.module or node.module.split(".")[0] not in ALLOWED_IMPORTS:
-                raise ProgramError(f"line {node.lineno}: import from '{node.module or '.'}' is not allowed")
-        elif isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
-            raise ProgramError(f"line {node.lineno}: '{node.id}' is not available to drawing programs")
+                raise ProgramError(f"line {line}: import from '{node.module or '.'}' is not allowed")
+            for alias in node.names:
+                if alias.name != "*" and (alias.name in FORBIDDEN_ATTRS or alias.name.startswith("_")):
+                    raise ProgramError(f"line {line}: 'from {node.module} import {alias.name}' is not available "
+                                       f"to drawing programs")
+                _check_identifier(alias.asname, line)
+        elif isinstance(node, ast.Name):
+            if node.id in FORBIDDEN_NAMES:
+                raise ProgramError(f"line {line}: '{node.id}' is not available to drawing programs")
+            if not (node.id == "__name__" and isinstance(node.ctx, ast.Load)):
+                _check_identifier(node.id, line)
         elif isinstance(node, ast.Attribute):
             attr = node.attr
             if attr in FORBIDDEN_ATTRS or (attr.startswith("__") and attr not in ALLOWED_DUNDERS):
-                raise ProgramError(f"line {node.lineno}: attribute '{attr}' is not available to drawing programs")
-        elif isinstance(node, (ast.Global, ast.Nonlocal)) and any(n.startswith("__") for n in node.names):
-            raise ProgramError(f"line {node.lineno}: dunder globals are not allowed")
+                raise ProgramError(f"line {line}: attribute '{attr}' is not available to drawing programs")
+            if not isinstance(node.ctx, ast.Load):
+                _check_identifier(attr, line)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name not in DEFINABLE_DUNDERS:
+                _check_identifier(node.name, line)
+        elif isinstance(node, ast.ClassDef):
+            _check_identifier(node.name, line)
+        elif isinstance(node, ast.arg):
+            _check_identifier(node.arg, line)
+        elif isinstance(node, ast.keyword):
+            _check_identifier(node.arg, line)
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            for name in node.names:
+                _check_identifier(name, line)
+        elif isinstance(node, ast.MatchClass):
+            # case object(os=x) looks the attribute up by name, like getattr.
+            for attr in node.kwd_attrs:
+                if attr in FORBIDDEN_ATTRS or attr.startswith("_"):
+                    raise ProgramError(f"line {line}: pattern attribute '{attr}' is not available to drawing programs")
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
+            _check_identifier(node.name, line)
+        elif isinstance(node, ast.MatchMapping):
+            _check_identifier(node.rest, line)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _NAME_LOOKUP_BUILTINS:
+            if len(node.args) > 1 and isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+                attr = node.args[1].value
+                if attr in FORBIDDEN_ATTRS or attr.startswith("_"):
+                    raise ProgramError(f"line {line}: {node.func.id}(..., {attr!r}) is not available to "
+                                       f"drawing programs")
     if not any(isinstance(n, ast.FunctionDef) and n.name == "draw" for n in tree.body):
         if not any(isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in
                    {"SVG", "svg", "IMAGE", "image", "img", "result"} for t in n.targets) for n in tree.body):

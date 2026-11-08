@@ -108,7 +108,7 @@ def test_image_url_of_a_render_edits_its_source():
 
 def test_foreign_image_url_is_sent_as_a_reference(tmp_path):
     from PIL import Image
-    ref = tmp_path / "photo.png"
+    ref = tmp_path / "work" / "photo.png"
     Image.new("RGB", (32, 32), (200, 10, 10)).save(ref)
     llm = FakeLlm([fenced(technique("brand_mark.py"))], [PASS])
     res = registered(llm).image_providers[0].generate("redraw this as a logo", "square", image_url=str(ref))
