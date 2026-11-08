@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 import logging
-import mimetypes
 import os
 import re
 import shutil
@@ -153,6 +153,57 @@ def working_dir() -> str:
         return str(resolve_agent_cwd())
     except Exception:
         return os.environ.get("TERMINAL_CWD") or os.getcwd()
+
+
+MAX_REFERENCE_BYTES = 8 * 1024 * 1024
+REFERENCE_FORMATS = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp", "GIF": "image/gif"}
+
+
+class ReferenceImageError(ValueError):
+    """A local reference image path was outside the allowed roots or was not a decodable image."""
+
+
+def reference_roots() -> List[Path]:
+    """Directories a model-supplied local image path may point into."""
+    roots = [Path(os.path.realpath(r)) for r in (store.hermes_home() / "cache", store.data_dir(), working_dir())]
+    # A session started at the filesystem root must not turn the whole disk into an allowed root.
+    return [r for r in roots if r != Path(r.anchor)]
+
+
+def reference_data_url(ref: str) -> str:
+    """Read a local reference image as a data: URL, or raise ReferenceImageError.
+
+    The path comes from the model, so it must resolve (symlinks included) under the Hermes cache,
+    the plugin data dir or the session working directory, and the bytes must decode as an image.
+    The MIME type is the decoded format, never the file name.
+    """
+    from PIL import Image
+    try:
+        real = Path(os.path.realpath(Path(ref).expanduser()))
+    except (OSError, ValueError) as exc:
+        raise ReferenceImageError(f"{ref!r} is not a usable path") from exc
+    if not any(real == root or root in real.parents for root in reference_roots()):
+        raise ReferenceImageError(f"{ref!r} is outside the Hermes cache, the plugin data dir and the working dir")
+    try:
+        if not real.is_file():
+            raise ReferenceImageError(f"{ref!r} is not a file")
+        if real.stat().st_size > MAX_REFERENCE_BYTES:
+            raise ReferenceImageError(f"{ref!r} is larger than {MAX_REFERENCE_BYTES // (1024 * 1024)} MiB")
+        data = real.read_bytes()
+    except OSError as exc:
+        raise ReferenceImageError(f"{ref!r} could not be read: {exc}") from exc
+    if len(data) > MAX_REFERENCE_BYTES:
+        raise ReferenceImageError(f"{ref!r} is larger than {MAX_REFERENCE_BYTES // (1024 * 1024)} MiB")
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            fmt = im.format
+            im.load()
+    except Exception as exc:  # PIL raises many types (UnidentifiedImageError, SyntaxError, DecompressionBomb...)
+        raise ReferenceImageError(f"{ref!r} is not a decodable image") from exc
+    mime = REFERENCE_FORMATS.get(fmt or "")
+    if mime is None:
+        raise ReferenceImageError(f"{ref!r} is a {fmt} image; use PNG, JPEG, WebP or GIF")
+    return f"data:{mime};base64," + base64.b64encode(data).decode()
 
 
 class JsonState:
@@ -416,11 +467,11 @@ class Engine:
     def _with_reference(user_text: str, ref: str) -> Any:
         url = ref
         if not ref.lower().startswith(("http://", "https://", "data:")):
-            p = Path(ref).expanduser()
-            if not p.is_file() or p.stat().st_size > 8 * 1024 * 1024:
+            try:
+                url = reference_data_url(ref)
+            except ReferenceImageError as exc:
+                logger.info("procgen: reference image refused: %s", exc)
                 return user_text + f"\n\n(Reference image {ref} could not be read; ignore it.)"
-            mime = mimetypes.guess_type(p.name)[0] or "image/png"
-            url = f"data:{mime};base64," + base64.b64encode(p.read_bytes()).decode()
         return [{"type": "text", "text": user_text + "\n\nThe attached image is a REFERENCE: match its composition "
                  "and subject, but draw it in the style contract above."},
                 {"type": "image_url", "image_url": {"url": url}}]

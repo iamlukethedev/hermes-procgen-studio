@@ -238,15 +238,20 @@ Under `plugins.isolation: host` Hermes does not wire plugin terminal subcommands
   slots if you pin them). No telemetry.
 - **Running model-written code:** Python drawing programs run in a **separate Python process**
   with an AST allowlist of imports (math, random, numpy, PIL and a few stdlib modules), no dunder
-  or frame access, trimmed builtins, an audit hook that refuses sockets, subprocesses, process
-  control, native library loading and any file read or write outside the job directory and the
-  read-only interpreter/font folders, plus CPU, memory and file-size limits and a wall-clock
+  or frame access (classes may define only `__init__`/`__post_init__`, and `getattr`, from-imports
+  and star imports refuse the same names as dotted access), trimmed builtins, an audit hook that
+  refuses sockets, subprocesses, process control, native library loading, any file read or write
+  outside the job directory and the read-only interpreter/font folders, and `mkdir`/`utime`
+  outside the job directory, plus CPU, memory and file-size limits and a wall-clock
   timeout. This is defence in depth, not a security boundary. Set `allow_python: false` to accept
   only literal SVG (external references disabled) and pixel specs, which run no code at all.
 - **Shell commands:** the video backend runs the system `ffmpeg` as a subprocess to encode frames.
   The render worker is started with the same Python interpreter Hermes uses.
 - **Files read:** a `STYLE.md` in the session's working directory (only when it has a `preset:` or
-  `palette:` line), your configured `style_file`, and images you pass as `image_url`.
+  `palette:` line), your configured `style_file`, and images you pass as `image_url`. A local
+  `image_url` is only read from under `$HERMES_HOME/cache/`, the plugin data dir or the session's
+  working directory, must decode as a PNG, JPEG, WebP or GIF with Pillow (the decoded format sets
+  the MIME type), and is capped at 8 MiB; anything else is ignored rather than sent to the model.
 - **Files written:** renders, sources and metadata under
   `$HERMES_HOME/plugin-data/procgen-studio/`, the published PNG/MP4 plus sidecars under
   `$HERMES_HOME/cache/generated/`, and your `output_dir` if you set one. `/procgen init` writes a
